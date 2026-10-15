@@ -16,7 +16,7 @@ interface LegacyDocumentProps {
 }
 
 /** Try to dynamically import react-markdown */
-let ReactMarkdownComponent: React.ComponentType<{ children: string; remarkPlugins?: unknown[] }> | null = null;
+let ReactMarkdownComponent: React.ComponentType<any> | null = null;
 let remarkGfmPlugin: unknown = null;
 let markdownLoadAttempted = false;
 
@@ -24,14 +24,16 @@ async function loadMarkdown() {
   if (markdownLoadAttempted) return;
   markdownLoadAttempted = true;
   try {
+    // Use proper dynamic imports without @vite-ignore
     const [md, gfm] = await Promise.all([
-      import(/* @vite-ignore */ 'react-markdown'),
-      import(/* @vite-ignore */ 'remark-gfm').catch(() => null),
+      import('react-markdown'),
+      import('remark-gfm').catch(() => null),
     ]);
     ReactMarkdownComponent = md.default;
     if (gfm) remarkGfmPlugin = gfm.default;
   } catch {
     // react-markdown not installed — use fallback
+    console.warn('react-markdown library not found. Using fallback text rendering.');
   }
 }
 
@@ -69,7 +71,7 @@ const DocumentRenderer: React.FC<RendererProps<DocumentComponent> & LegacyDocume
     if (ReactMarkdownComponent) {
       const plugins = remarkGfmPlugin ? [remarkGfmPlugin] : [];
       return (
-        <ReactMarkdownComponent remarkPlugins={plugins}>
+        <ReactMarkdownComponent remarkPlugins={plugins as any}>
           {docContent}
         </ReactMarkdownComponent>
       );

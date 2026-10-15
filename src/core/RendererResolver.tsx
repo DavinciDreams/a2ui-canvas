@@ -3,7 +3,7 @@
  * the correct renderer for each A2UI component.
  */
 
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState, useCallback } from 'react';
 import type { A2UIComponent } from '../schema/component-types';
 import type { ComponentRegistry } from './ComponentRegistry';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -13,7 +13,7 @@ interface RendererResolverProps {
   data: unknown;
   registry: ComponentRegistry;
   theme?: unknown;
-  onError?: (error: Error) => void;
+  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
   loadingFallback?: React.ReactNode;
 }
 
@@ -32,32 +32,37 @@ export const RendererResolver: React.FC<RendererResolverProps> = ({
   const [Renderer, setRenderer] = useState<React.ComponentType<any> | null>(null);
   const [resolveError, setResolveError] = useState<Error | null>(null);
 
+  const rendererKey = component.component === 'Custom'
+    ? (component as { rendererKey?: string }).rendererKey
+    : undefined;
+
+  const resolveRenderer = useCallback(async () => {
+    try {
+      const resolved = await registry.resolve(component.component, rendererKey);
+      if (resolved) {
+        setRenderer(resolved);
+      } else {
+        setResolveError(new Error(`No renderer found for component type: ${component.component}${rendererKey ? ` (key: ${rendererKey})` : ''}`));
+      }
+    } catch (err) {
+      setResolveError(err instanceof Error ? err : new Error(String(err)));
+    }
+  }, [component.component, rendererKey, registry]);
+
   useEffect(() => {
-    let cancelled = false;
+    const abortController = new AbortController();
+    const signal = abortController.signal;
 
-    const rendererKey = component.component === 'Custom'
-      ? (component as { rendererKey?: string }).rendererKey
-      : undefined;
+    resolveRenderer().catch((err) => {
+      if (!signal.aborted) {
+        setResolveError(err instanceof Error ? err : new Error(String(err)));
+      }
+    });
 
-    registry
-      .resolve(component.component, rendererKey)
-      .then((resolved) => {
-        if (!cancelled) {
-          if (resolved) {
-            setRenderer(() => resolved);
-          } else {
-            setResolveError(new Error(`No renderer found for component type: ${component.component}${rendererKey ? ` (key: ${rendererKey})` : ''}`));
-          }
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setResolveError(err instanceof Error ? err : new Error(String(err)));
-        }
-      });
-
-    return () => { cancelled = true; };
-  }, [component.component, registry]);
+    return () => {
+      abortController.abort();
+    };
+  }, [resolveRenderer]);
 
   if (resolveError) {
     return (

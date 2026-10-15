@@ -1,0 +1,10 @@
+dist
+node_modules
+coverage
+*.config.js
+*.config.ts
+vite.config.ts
+vitest.config.ts
+package-lock.json
+pnpm-lock.yaml
+yarn.lock

@@ -18,10 +18,12 @@ async function loadCesium() {
   if (cesiumLoadAttempted) return;
   cesiumLoadAttempted = true;
   try {
-    const resium = await import(/* @vite-ignore */ 'resium');
+    // Use proper dynamic import without @vite-ignore
+    const resium = await import('resium');
     CesiumViewer = resium.Viewer;
   } catch {
     // not installed — use fallback
+    console.warn('Resium/Cesium library not found. Using fallback SVG rendering.');
   }
 }
 

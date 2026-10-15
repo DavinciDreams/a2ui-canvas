@@ -9,21 +9,21 @@ import type { ComponentType } from 'react';
 import type { A2UIComponentType } from '../schema/component-types';
 
 /** Props that every renderer receives */
-export interface RendererProps<T = Record<string, unknown>> {
+export interface RendererProps<T = unknown> {
   component: T;
   data: unknown;
   theme?: unknown;
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type RendererComponent = ComponentType<any>;
-type RendererFactory = () => Promise<{ default: RendererComponent }>;
+// Type for any component that extends RendererProps
+type AnyRendererComponent = ComponentType<RendererProps<any>>;
+// Type for any component module
+type AnyComponentModule = { default: AnyRendererComponent };
 
 interface RegistryEntry {
   /** Lazy factory for code-splitting */
-  factory: RendererFactory;
+  factory: () => Promise<AnyComponentModule>;
   /** Resolved component (cached after first load) */
-  resolved?: RendererComponent;
+  resolved?: AnyRendererComponent;
 }
 
 export class ComponentRegistry {
@@ -31,17 +31,17 @@ export class ComponentRegistry {
   private customRenderers = new Map<string, RegistryEntry>();
 
   /** Register a built-in renderer (lazy-loaded) */
-  register(componentType: A2UIComponentType, factory: RendererFactory): void {
+  register(componentType: A2UIComponentType, factory: () => Promise<AnyComponentModule>): void {
     this.renderers.set(componentType, { factory });
   }
 
   /** Register a custom renderer by key */
-  registerCustom(rendererKey: string, factory: RendererFactory): void {
+  registerCustom(rendererKey: string, factory: () => Promise<AnyComponentModule>): void {
     this.customRenderers.set(rendererKey, { factory });
   }
 
   /** Register a custom renderer with an already-resolved component */
-  registerCustomSync(rendererKey: string, component: RendererComponent): void {
+  registerCustomSync(rendererKey: string, component: AnyRendererComponent): void {
     this.customRenderers.set(rendererKey, {
       factory: async () => ({ default: component }),
       resolved: component,
@@ -49,7 +49,7 @@ export class ComponentRegistry {
   }
 
   /** Get the renderer for a component type (lazy loads on first access) */
-  async resolve(componentType: string, rendererKey?: string): Promise<RendererComponent | null> {
+  async resolve(componentType: string, rendererKey?: string): Promise<AnyRendererComponent | null> {
     // For Custom components, look up by rendererKey
     if (componentType === 'Custom' && rendererKey) {
       const custom = this.customRenderers.get(rendererKey);
@@ -93,15 +93,15 @@ export class ComponentRegistry {
 export function createDefaultRegistry(): ComponentRegistry {
   const registry = new ComponentRegistry();
 
-  registry.register('Chart', () => import('../renderers/ChartRenderer'));
-  registry.register('Timeline', () => import('../renderers/TimelineRenderer'));
-  registry.register('KnowledgeGraph', () => import('../renderers/KnowledgeGraphRenderer'));
-  registry.register('Map', () => import('../renderers/MapRenderer'));
-  registry.register('Media', () => import('../renderers/MediaRenderer'));
-  registry.register('Document', () => import('../renderers/DocumentRenderer'));
-  registry.register('Code', () => import('../renderers/CodeRenderer'));
-  registry.register('Artifact', () => import('../renderers/ArtifactRenderer'));
-  registry.register('Custom', () => import('../renderers/CustomRenderer'));
+  registry.register('Chart', async () => await import('../renderers/ChartRenderer'));
+  registry.register('Timeline', async () => await import('../renderers/TimelineRenderer'));
+  registry.register('KnowledgeGraph', async () => await import('../renderers/KnowledgeGraphRenderer'));
+  registry.register('Map', async () => await import('../renderers/MapRenderer'));
+  registry.register('Media', async () => await import('../renderers/MediaRenderer'));
+  registry.register('Document', async () => await import('../renderers/DocumentRenderer'));
+  registry.register('Code', async () => await import('../renderers/CodeRenderer'));
+  registry.register('Artifact', async () => await import('../renderers/ArtifactRenderer'));
+  registry.register('Custom', async () => await import('../renderers/CustomRenderer'));
 
   return registry;
 }

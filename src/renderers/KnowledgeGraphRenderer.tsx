@@ -17,10 +17,12 @@ async function loadForceGraph() {
   if (forceGraphLoadAttempted) return;
   forceGraphLoadAttempted = true;
   try {
-    const mod = await import(/* @vite-ignore */ 'react-force-graph-2d');
+    // Use proper dynamic import without @vite-ignore
+    const mod = await import('react-force-graph-2d');
     ForceGraph2DComponent = mod.default;
   } catch {
     // not installed — use fallback
+    console.warn('react-force-graph-2d library not found. Using fallback SVG rendering.');
   }
 }
 

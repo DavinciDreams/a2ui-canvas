@@ -24,13 +24,15 @@ async function loadShiki() {
   if (shikiLoadAttempted) return;
   shikiLoadAttempted = true;
   try {
-    const shiki = await import(/* @vite-ignore */ 'shiki');
+    // Use proper dynamic import without @vite-ignore
+    const shiki = await import('shiki');
     shikiHighlighter = await shiki.createHighlighter({
       themes: ['github-dark', 'github-light'],
       langs: ['javascript', 'typescript', 'python', 'rust', 'go', 'java', 'c', 'cpp', 'html', 'css', 'json', 'yaml', 'markdown', 'bash', 'sql', 'text'],
     });
   } catch {
     // shiki not installed — use fallback
+    console.warn('Shiki syntax highlighter not found. Using fallback code rendering.');
   }
 }
 

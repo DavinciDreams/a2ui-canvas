@@ -61,6 +61,7 @@ function AgentCanvas() {
 
   if (!activeSurface) return <div>Waiting for agent...</div>;
 
+
   return (
     <div>
       {getComponents(activeSurface.id).map((component) => (
@@ -230,6 +231,9 @@ interface UseA2UISurfaceOptions {
   batchWindow?: number;      // Batch window in ms (default: 50)
   onError?: (error: Error) => void;
   store?: StoreApi<SurfaceManagerStore>; // Shared store
+  middleware?: MiddlewareRegistry; // Message processing pipeline
+  enableMetrics?: boolean;    // Enable performance tracking
+  retryStrategy?: RetryStrategy; // Connection retry configuration
 }
 ```
 
@@ -281,27 +285,41 @@ const messages = ContentAnalyzer.toA2UIMessages('```python\nprint("hello")\n```'
 ## Theming
 
 ```tsx
-import { themes } from '@atlas.agents/a2ui-canvas';
+import {
+  themes,
+  mergeThemes,
+  validateTheme,
+  createAccentTheme,
+  createHighContrastTheme,
+  createDarkTheme,
+  themePresets,
+  getThemePreset
+} from '@atlas.agents/a2ui-canvas';
 
 // Built-in themes
 themes.light
 themes.dark
 themes.default
 
-// Custom theme
-const myTheme = {
-  colors: {
-    background: '#0a0a0a',
-    surface: '#1a1a2e',
-    primary: '#0ea5e9',
-    secondary: '#6366f1',
-    text: '#e2e8f0',
-    muted: '#64748b',
-    border: '#334155',
-    highlight: '#1e293b',
-  },
-  // ...spacing, typography, borderRadius, shadows
-};
+// Theme utilities
+const customTheme = mergeThemes(themes.default, {
+  colors: { primary: '#ff6b6b' }
+});
+
+// Validate theme
+if (validateTheme(customTheme)) {
+  // Theme is valid
+}
+
+// Create accent theme
+const blueTheme = createAccentTheme(themes.default, '#0066cc');
+
+// Create high contrast theme
+const highContrast = createHighContrastTheme(themes.default);
+
+// Use theme presets
+const greenTheme = getThemePreset('green');
+const availablePresets = getThemePresetNames();
 ```
 
 ## Custom Renderers
@@ -328,14 +346,111 @@ registry.register('MyWidget', () => import('./MyWidget'));
 ```
 AI Agent → A2UI JSON → StreamProcessor → SurfaceManager → RendererResolver → React Renderers
                (JSONL/SSE/WS)    (zustand store)     (Suspense + ErrorBoundary)
-                                                                    ↓
-                                    Chart | Timeline | Graph | Map | Media | Doc | Code | Artifact | Custom
+                                                                     ↓
+                                     Chart | Timeline | Graph | Map | Media | Doc | Code | Artifact | Custom
 ```
 
-- **StreamProcessor**: Parses JSONL, SSE, WebSocket, or direct JSON arrays
+- **StreamProcessor**: Parses JSONL, SSE, WebSocket, or direct JSON arrays with middleware support
 - **SurfaceManager**: Zustand store managing surfaces, data models, and components
 - **RendererResolver**: Suspense + ErrorBoundary wrapper for lazy-loaded renderers
 - **ComponentRegistry**: Maps component type strings to React renderer factories
+- **MiddlewareRegistry**: Message processing pipeline with before/after hooks
+- **MetricsCollector**: Performance monitoring for render times, message processing, and cache hit rates
+
+## Advanced Features
+
+### Middleware System
+
+Process messages through a customizable pipeline with before/after hooks:
+
+```tsx
+import { useA2UISurface, MiddlewareRegistry, createLoggingMiddleware, createValidationMiddleware } from '@atlas.agents/a2ui-canvas';
+
+// Create middleware registry
+const middleware = new MiddlewareRegistry();
+
+// Register middleware
+middleware.register(createLoggingMiddleware({ logLevel: 'info' }));
+middleware.register(createValidationMiddleware({
+  requiredFields: ['id', 'component'],
+  customValidator: (msg) => msg.id !== null
+}));
+
+// Use with surface hook
+const { activeSurface } = useA2UISurface({
+  sseUrl: '/api/stream',
+  middleware,
+  enableMetrics: true,
+});
+```
+
+Built-in middleware:
+- **Logging**: Log messages with configurable levels
+- **Validation**: Validate required fields and custom rules
+- **Transformation**: Modify messages in-flight
+- **Deduplication**: Filter duplicate messages
+- **Rate Limiting**: Throttle message processing
+
+### Performance Monitoring
+
+Track component render times, message processing, and cache performance:
+
+```tsx
+import { globalMetrics } from '@atlas.agents/a2ui-canvas';
+
+// Get render statistics
+const renderStats = globalMetrics.getRenderStats();
+console.log(`Average render time: ${renderStats.avg}ms`);
+
+// Get message processing stats
+const processingStats = globalMetrics.getMessageProcessingStats();
+console.log(`Processed ${processingStats.count} messages`);
+
+// Get cache hit rates
+const cacheStats = globalMetrics.getCacheMetrics();
+console.log(`Cache hit rate: ${(cacheStats.hitRate * 100).toFixed(1)}%`);
+
+// Query metrics
+const allMetrics = globalMetrics.queryMetrics({
+  type: 'timing',
+  limit: 100
+});
+```
+
+### Enhanced Theme System
+
+Create and validate themes with utilities:
+
+```tsx
+import {
+  mergeThemes,
+  validateTheme,
+  createAccentTheme,
+  themePresets
+} from '@atlas.agents/a2ui-canvas';
+
+// Merge themes
+const customTheme = mergeThemes(themes.dark, {
+  colors: { primary: '#00ff88' }
+});
+
+// Validate theme
+if (validateTheme(customTheme)) {
+  // Use theme
+}
+
+// Use presets
+const blueTheme = themePresets.blue;
+const greenTheme = getThemePreset('green');
+```
+
+Available presets:
+- **blue**: Blue accent theme
+- **green**: Green accent theme
+- **red**: Red accent theme
+- **purple**: Purple accent theme
+- **highContrastLight**: High contrast light theme
+- **highContrastDark**: High contrast dark theme
 
 ## Bundle Size
 

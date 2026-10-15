@@ -33,9 +33,13 @@ async function loadD3() {
   if (d3LoadAttempted) return;
   d3LoadAttempted = true;
   try {
-    d3Module = await import(/* @vite-ignore */ 'd3');
+    // Use a try-catch block with proper dynamic import
+    // This allows Vite to properly analyze the dependency
+    const module = await import('d3');
+    d3Module = module.default || module;
   } catch {
     // d3 not installed — use SVG fallback
+    console.warn('D3 library not found. Using fallback SVG rendering.');
   }
 }
 
@@ -59,7 +63,7 @@ const ChartRenderer: React.FC<RendererProps<ChartComponent> & LegacyChartProps> 
     if (Array.isArray(data)) return data as ChartDataItem[];
     if (legacyContent?.data) {
       const { labels, values } = legacyContent.data;
-      return labels.map((label, i) => ({ label, value: values[i] ?? 0 }));
+      return labels.map((label: string, i: number) => ({ label, value: values[i] ?? 0 }));
     }
     return [];
   }, [data, legacyContent]);
